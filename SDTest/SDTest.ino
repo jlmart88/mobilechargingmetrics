@@ -1,20 +1,5 @@
 /*
-  SD card read/write
- 
- This example shows how to read and write data to and from an SD card file 	
- The circuit:
- * SD card attached to SPI bus as follows:
- ** MOSI - pin 11
- ** MISO - pin 12
- ** CLK - pin 13
- ** CS - pin 4
- 
- created   Nov 2010
- by David A. Mellis
- modified 9 Apr 2012
- by Tom Igoe
- 
- This example code is in the public domain.
+Testing for RRD functionality and timeserver syncing
  	 
  */
  
@@ -26,17 +11,13 @@
 File myFile;
 File myFile1;
 File myFile2;
+
 RRDSD archiveRRD;//
 RRDSD archiveRRD2;
-
 RRDSD myRRD;//
 
-char timestampchar[19];
 char dataBuffer[3];
 char timestampBuffer[19]; 
-
- 
-
 
 int average(int intArray[], int length)
 {
@@ -68,98 +49,24 @@ void setup()
     return;
   }
   Serial.println(F("initialization done."));
-  
-  //archiveRRD.resetFile();
-  //myRRD.resetFile();
-  //SD.remove("testArch.txt");
-  //SD.remove("testRRD.txt");
-  
-  //archiveRRD.resetFile();
+
   archiveRRD2 = RRDSD("testArc2.txt",4,12,22,2);
   archiveRRD = RRDSD("testArch.txt",2,4,22,2,&archiveRRD2,&average);
   myRRD = RRDSD("testRRD.txt",1,2,22,2,&archiveRRD,&average);
+  
+  // Remove these lines to not clear the file on reset
   myRRD.resetFile();
   archiveRRD.resetFile();
   archiveRRD2.resetFile();
-  
-  //Serial.println(myRRD.getLength());
-  //Serial.println(myRRD.getArchiveLength());
 
-  //archiveRRD.log("50");
-  /*
-  myRRD.log("80");
-  myRRD.log("75");
-  myRRD.log("60");
-  myRRD.log("90");
-  myRRD.log("20");
-  //myRRD.log("90");
-  */
-  
- 
-  
-  
-  
-//  // open the file. note that only one file can be open at a time,
-//  // so you have to close this one before opening another.
-//  myFile = SD.open("test.txt", FILE_WRITE);
-//  
-//  // if the file opened okay, write to it:
-//  if (myFile) {
-//    myFile.seek(0);
-//    Serial.print("Position: ");
-//    Serial.println(myFile.position());
-//    
-//    Serial.print("Writing to test.txt...");
-//    
-//    myFile.println("testing 1, 2, 3");
-//	// close the file:
-//    
-//    Serial.println("done.");
-//    Serial.print("Position: ");
-//    Serial.println(myFile.position());
-//    myFile.close();
-//  } else {
-//    // if the file didn't open, print an error:
-//    Serial.println("error opening test.txt");
-//  }
-//  
-//  // re-open the file for reading:
-//  myFile = SD.open("test.txt");
-//  if (myFile) {
-//    Serial.println("test.txt:");
-//    
-//    // read from the file until there's nothing else in it:
-//    while (myFile.available()) {
-//    	Serial.write(myFile.read());
-//    }
-//    // close the file:
-//    myFile.close();
-//  } else {
-//  	// if the file didn't open, print an error:
-//    Serial.println("error opening test.txt");
-//  }
 }
 
 void loop()
 {
-  
-//  String timestamp=String(hour());
-//  timestamp+=":";
-//  timestamp+=String(minute());
-//  timestamp+=":";
-//  timestamp+=String(second());
-//  timestamp+=",";
-//  timestamp+=String(day());
-//  timestamp+="/";
-//  timestamp+=String(month());
-//  timestamp+="/";
-//  timestamp+=String(year());
-//  char timestampchar[timestamp.length()+1];
-//  timestamp.toCharArray(timestampchar, timestamp.length()+1);
-   getTimestamp(&timestampchar[0]);
-  Serial.println(timestampchar);
+  getTimestamp(&timestampBuffer[0]);
+  Serial.println(timestampBuffer);
   //Serial.print(F("freeMemory()="));Serial.println(freeMemory());
-    boolean archive = myRRD.log("50",&timestampchar[0], &dataBuffer[0], &timestampBuffer[0]);
+    boolean archive = myRRD.log("50",&timestampBuffer[0], &dataBuffer[0], &timestampBuffer[0]);
   if (archive){
     //Serial.print(F("freeMemory()="));Serial.println(freeMemory());
     //Serial.print(F("databuffer: ")); Serial.println(dataBuffer);
@@ -170,9 +77,7 @@ void loop()
    archiveRRD2.log(&dataBuffer[0],&timestampBuffer[0]); 
   }
   }
- 
-  //delete[] dataBuffer;
-  //delete[] timestampBuffer;
+
   
   Serial.print(F("freeMemory()="));Serial.println(freeMemory());
    
@@ -194,8 +99,6 @@ void loop()
   }
   else Serial.println("failed");
   
-  
-  
   myFile = SD.open("testRRD.txt");
   if(myFile){
     while (myFile.available()) {
@@ -204,10 +107,9 @@ void loop()
     myFile.close();
   }
   else Serial.println("failed");
+  
+  // delay for readability in Serial
   delay(3000);
-  
-  
- 
 }
 
 void getTimestamp(char *timestamp){
@@ -238,14 +140,12 @@ void getTimestamp(char *timestamp){
    timestamp[12]='0';
  }
   sprintf(timestamp+15, "%d", year(t));
-
- 
+  
  timestamp[2]=':';
  timestamp[5]=':';
  timestamp[8]=',';
  timestamp[11]='/';
- timestamp[14]='/';
- 
+ timestamp[14]='/'; 
 }
 
 
