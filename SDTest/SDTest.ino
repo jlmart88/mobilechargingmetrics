@@ -8,9 +8,9 @@ Testing for RRD functionality and timeserver syncing
 #include <SdFat.h>
 
 #include <MemoryFree.h>
-//#include <SPI.h>
-//#include <Ethernet.h>
-//#include <EthernetUdp.h>
+#include <SPI.h>
+#include <Ethernet.h>
+#include <EthernetUdp.h>
 
 SdFile myFile;
 SdFile myFile1;
@@ -27,33 +27,33 @@ char timestampBuffer[19];
 
  /* ******** Ethernet Card Settings ******** */
 // Set this to your Ethernet Card Mac Address
-//byte mac[] = { 0x90, 0xA2, 0xDA, 0x0D, 0xBA, 0x72 };
+byte mac[] = { 0x90, 0xA2, 0xDA, 0x0D, 0xBA, 0x72 };
  
 /* ******** NTP Server Settings ******** */
 /* us.pool.ntp.org NTP server
    (Set to your time server of choice) */
-//IPAddress timeServer(132, 163, 4, 101);
+IPAddress timeServer(132, 163, 4, 101);
  
 /* Set this to the offset (in seconds) to your local time
-   This example is GMT - 6 */
-//const long timeZoneOffset = -18000L;  
+   This example is GMT - 5 */
+const long timeZoneOffset = -18000L;  
  
 /* Syncs to NTP server every 15 seconds for testing,
    set to 1 hour or more to be reasonable */
-//unsigned int ntpSyncTime = 60;        
+unsigned int ntpSyncTime = 300;        
  
  
 /* ALTER THESE VARIABLES AT YOUR OWN RISK */
 // local port to listen for UDP packets
-//unsigned int localPort = 8888;
+unsigned int localPort = 8888;
 // NTP time stamp is in the first 48 bytes of the message
-//const int NTP_PACKET_SIZE= 48;      
+const int NTP_PACKET_SIZE= 48;      
 // Buffer to hold incoming and outgoing packets
-//byte packetBuffer[NTP_PACKET_SIZE];  
+byte packetBuffer[NTP_PACKET_SIZE];  
 // A UDP instance to let us send and receive packets over UDP
-//EthernetUDP Udp;                    
+EthernetUDP Udp;                    
 // Keeps track of how long ago we updated the NTP server
-//unsigned int ntpLastUpdate = 0;    
+unsigned long ntpLastUpdate = 0;    
 // Check last time clock displayed (Not in Production)
 //time_t prevDisplay = 0;
 
@@ -94,53 +94,54 @@ void setup()
   archiveRRD2.resetFile();
   //digitalWrite(4,HIGH);
   //digitalWrite(10,LOW);
-  /*
+  
  // Ethernet shield and NTP setup
  int i = 0;
  int DHCP = 0;
  DHCP = Ethernet.begin(mac);
  //Try to get dhcp settings 30 times before giving up
  
- while( DHCP == 0 && i < 30){
+ while( DHCP == 0 && i < 5){
    delay(1000);
    DHCP = Ethernet.begin(mac);
    i++;
  }
  
- 
+ /*
  if(!DHCP){
   Serial.println("DHCP FAILED");
    //for(;;); //Infinite loop because DHCP Failed
  }
  Serial.println("DHCP Success");
- */
+ 
  //Try to get the date and time
-/*
- int i=0;
+*/
+ i=0;
  while(!getTimeAndDate() && i<1) {
    i++;
  }
-*/
+
 }
 
 void loop()
 {
   //digitalWrite(10,LOW);
     // Update the time via NTP server as often as the time you set at the top
-    /*
+    
   if(now()-ntpLastUpdate > ntpSyncTime) {
+    Serial.print(now()-ntpLastUpdate);
     int trys=0;
-    while(!getTimeAndDate() && trys<1){
+    while(!getTimeAndDate() && trys<3){
       trys++;
     }
-    if(trys<1){
+    if(trys<3){
       Serial.println("ntp server update success");
     }
     else{
       Serial.println("ntp server update failed");
     }
   }
- 
+ /*
   // Display the time if it has changed by more than a second.
   if( now() != prevDisplay){
     prevDisplay = now();
@@ -168,7 +169,7 @@ void loop()
   //Serial.print(F("freeMemory()="));Serial.println(freeMemory());
   
   //myFile2.open("testArc2.txt",O_READ);
-  if(myFile2.open("testArc2.txt", O_RDWR)){
+  if(myFile2.open("testArc2.txt", O_READ)){
     while (myFile2.available()) {
   	Serial.write(myFile2.read());
     }
@@ -233,7 +234,7 @@ void getTimestamp(char *timestamp){
  timestamp[11]='/';
  timestamp[14]='/'; 
 }
-/*
+
 // Do not alter this function, it is used by the system
 int getTimeAndDate() {
    int flag=0;
@@ -247,6 +248,7 @@ int getTimeAndDate() {
      lowWord = word(packetBuffer[42], packetBuffer[43]);  
      epoch = highWord << 16 | lowWord;
      epoch = epoch - 2208988800 + timeZoneOffset;
+     epoch = epoch + dstOffset(epoch);  //Adjust for DLT
      flag=1;
      setTime(epoch);
      ntpLastUpdate = now();
@@ -270,9 +272,31 @@ unsigned long sendNTPpacket(IPAddress& address)
   Udp.write(packetBuffer,NTP_PACKET_SIZE);
   Udp.endPacket();
 }
+
+int dstOffset (unsigned long unixTime)
+{
+  //Receives unix epoch time and returns seconds of offset for local DST
+  //Valid thru 2099 for US only, Calculations from "http://www.webexhibits.org/daylightsaving/i.html"
+  //Code idea from jm_wsb @ "http://forum.arduino.cc/index.php/topic,40286.0.html"
+  //Get epoch times @ "http://www.epochconverter.com/" for testing
+  //DST update wont be reflected until the next time sync
+  time_t t = unixTime;
+  int beginDSTDay = (14 - (1 + year(t) * 5 / 4) % 7);  
+  int beginDSTMonth=3;
+  int endDSTDay = (7 - (1 + year(t) * 5 / 4) % 7);
+  int endDSTMonth=11;
+  if (((month(t) > beginDSTMonth) && (month(t) < endDSTMonth))
+    || ((month(t) == beginDSTMonth) && (day(t) > beginDSTDay))
+    || ((month(t) == beginDSTMonth) && (day(t) == beginDSTDay) && (hour(t) >= 2))
+    || ((month(t) == endDSTMonth) && (day(t) < endDSTDay))
+    || ((month(t) == endDSTMonth) && (day(t) == endDSTDay) && (hour(t) < 1)))
+    return (3600);  //Add back in one hours worth of seconds - DST in effect
+  else
+    return (0);  //NonDST
+}
  
 // Clock display of the time and date (Basic)
-
+/*
 void clockDisplay(){
   Serial.print(hour());
   printDigits(minute());
